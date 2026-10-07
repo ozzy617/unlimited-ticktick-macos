@@ -4,7 +4,7 @@ set -euo pipefail
 # Path or URL to the .app, .dmg, or directory containing TickTick.app to patch.
 # Defaults to /Applications/TickTick.app if not provided.
 DEFAULT_SOURCE="/Applications/TickTick.app"
-SOURCE_INPUT="${1:-$DEFAULT_SOURCE}"
+SOURCE_INPUT_RAW="${1:-$DEFAULT_SOURCE}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP="$SCRIPT_DIR/build/TickTick.patched.app"
@@ -50,6 +50,33 @@ require_tool() {
 
 is_url() {
   [[ "$1" == http://* || "$1" == https://* ]]
+}
+
+normalize_source_input() {
+  local input="$1"
+
+  # Accept markdown-styled URLs accidentally pasted into workflow inputs.
+  if [[ "$input" == *"]("* ]]; then
+    input="${input#*](}"
+    input="${input%)}"
+  fi
+
+  if [[ "$input" == \[http://*\] || "$input" == \[https://*\] ]]; then
+    input="${input#[}"
+    input="${input%]}"
+  fi
+
+  if [[ "$input" == \"*\" ]]; then
+    input="${input#\"}"
+    input="${input%\"}"
+  fi
+
+  if [[ "$input" == \'*\' ]]; then
+    input="${input#\'}"
+    input="${input%\'}"
+  fi
+
+  printf '%s\n' "$input"
 }
 
 download_source() {
@@ -133,6 +160,8 @@ require_tool xattr
 require_tool hdiutil
 require_tool plutil
 require_tool curl
+
+SOURCE_INPUT="$(normalize_source_input "$SOURCE_INPUT_RAW")"
 
 if [[ "$SOURCE_INPUT" == "-h" || "$SOURCE_INPUT" == "--help" || "$SOURCE_INPUT" == "help" ]]; then
   usage
